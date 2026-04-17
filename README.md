@@ -44,7 +44,9 @@ timeline
     2014     : OpenBCI Cyton — open-source EEG hits the mainstream
     2017     : Open Ephys + EEG (Siegle et al., Black et al.) — 128-ch open platform
     2021     : NeuroIDSS FreeEEG32-beta — ADS131M08 proving ground
+    2022     : Fiedler et al. — 256-channel dry cap for VHD-EEG
     2023     : NeuroIDSS FreeEEG128-alpha — 16× ADS131M08, MindBigData 2023 MNIST-8B
+    2024     : g.tec g.Pangolin (Schreiner et al.) — 1024-channel VHD-EEG SOTA, matches ECoG
     2024     : Neurogate OctaFlow — ESP32-C3 + ADS1299, 8-ch teaching board
     2026     : FreeEEG128 firmware rewrite + Pi-Zero-2W beta (this project)
 ```
@@ -97,6 +99,12 @@ We treat **Black, Voigts, Agrawal, Ladow, Santoyo, Moore & Jones (2017), "Open E
 | Ecosystem fit | Open Ephys GUI native | LSL / BrainFlow / MNE-CPP / Open Ephys GUI |
 
 Full comparison matrix in [`COMPARISON.md`](COMPARISON.md#black-et-al-2017-open-ephys--eeg-vs-freeeeg128--primary-comparison).
+
+### Where this sits vs. the VHD-EEG frontier
+
+The **very-high-density** (VHD) EEG state-of-the-art is now **g.tec's g.Pangolin**, a 1024-channel-capable platform built on flex-PCB active-wet electrode grids with 8.6 mm spacing and on-grid pre-amplification, feeding up to four 256-channel g.HIamp amplifiers. Schreiner et al. (2024, *Scientific Reports*, [doi:10.1038/s41598-024-57167-y](https://doi.org/10.1038/s41598-024-57167-y)) demonstrate central-sulcus delineation at **95.2% accuracy — comparable to invasive intracranial ECoG**.
+
+FreeEEG128 is deliberately **not** chasing VHD status. Open hardware has no peer at 256+ channels as of 2026; we occupy the "affordable, open, 128-channel wearable" niche — an order or two of magnitude below g.Pangolin in both channels and cost, above everything else in the open-hardware column. A natural FreeEEG256 upgrade on the same STM32H743 + ADS131M08 chassis is plausible (32 chips across 6 SPI buses) but out of scope for this project. See [`HISTORY.md §4b`](HISTORY.md#4b-the-very-high-density-frontier--gpangolin-and-1024-channel-eeg-2020s) and [`COMPARISON.md`](COMPARISON.md#vhd-eeg-state-of-the-art-gpangolin-1024-channel-ceiling) for the VHD-EEG SOTA treatment.
 
 ---
 

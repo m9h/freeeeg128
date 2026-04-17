@@ -136,6 +136,59 @@ match or beat every row below.
 
 ---
 
+---
+
+## VHD-EEG state-of-the-art: g.Pangolin (1024-channel ceiling)
+
+The open-hardware landscape table above sits *below* the commercial
+very-high-density (VHD / uHD) frontier. As of 2024, the SOTA for
+non-invasive scalp EEG is **g.tec's g.Pangolin**, built around flexible-
+PCB active-wet electrode grids feeding up to four g.HIamp 256-channel
+amplifiers.
+
+| Axis | g.Pangolin (g.tec, 2023-) | FreeEEG128 (this project) |
+| --- | --- | --- |
+| Channels | up to **1024** (4× 256-ch g.HIamp) | 128 |
+| Electrode technology | Active wet, flex-PCB grids (16 ch per grid) | Passive dry Ag/AgCl (130 electrodes, 10/5 cap) |
+| Inter-electrode distance | 8.6 mm | ~20 mm (standard 10/5 at 128 channels) |
+| Electrode diameter | 5.9 mm | 12 mm |
+| Pre-amplification | On-grid pre-amp, fixed gain 10 | None (passive → ADS131M08 gain 32 in-chip) |
+| Sample rate | up to 38.4 kHz per channel | 250 Hz default (chip supports 32 kHz) |
+| ADC resolution | 24-bit | 24-bit |
+| Application | Clinical / research VHD, neurosurgical mapping, BCI | Open-hardware research, teaching, wearable EEG |
+| Form factor | Desk-tethered, amp-on-belt with cables | Belt-pack wearable (see `ENCLOSURE.md`) |
+| License | Proprietary (g.tec) | AGPL-3.0 + planned CERN-OHL-S-v2 |
+| Cost | Likely >USD 100 000 for full 1024-ch system (unverified) | ~USD 500-1000 BOM |
+| Primary paper | Schreiner et al. 2024, *Sci Rep* 14, doi:10.1038/s41598-024-57167-y | this project |
+| Demonstrated validation | 95.2% anterior/posterior-to-CS classification accuracy via SSEP phase reversal — matches invasive ECoG | Planned: Black 2017 eyes-closed alpha replication |
+
+**Key takeaway**: g.Pangolin at 256-ch density achieves localization
+comparable to invasive intracranial recording. That's the frontier
+FreeEEG128 is not chasing; instead, we target the "open, affordable, 128-
+channel wearable" niche that has no current peer. A natural upgrade path
+exists for a hypothetical `FreeEEG256` on the same STM32H743 + ADS131M08
+chassis, but that is explicitly not within the current roadmap.
+
+### Supporting VHD-EEG literature
+
+- **Schreiner et al. 2024** — introduces g.Pangolin; demonstrates 256-ch
+  VHD EEG delineating the central sulcus at intracranial-comparable
+  accuracy. (Primary comparison paper.)
+- **Shirazi, Onton & Makeig 2025** (*bioRxiv*) — simulates scalp EEG from
+  ultra-high-density ECoG to quantify cortex-to-scalp projection patterns.
+  Motivates the spatial-Nyquist case for VHD EEG.
+- **Liu, Ganzetti, Wenderoth & Mantini 2018** (*Front. Neuroinformatics*)
+  — systematic study of how electrode density, head modeling, and source
+  localization interact when detecting large-scale brain networks;
+  methodological justification for the density race.
+- **Fiedler et al. 2022** — 256-channel dry cap for VHD-EEG. Shows the
+  dry-electrode path is viable at 256 channels, relevant to a possible
+  FreeEEG256 direction.
+- **Grover & Venkatesh** (cited in Schreiner 2024) — information-theoretic
+  analysis of EEG spatial bandwidth arguing for thousands of sensors.
+
+---
+
 ## Open questions to resolve before beta freeze
 
 - Do we commit to **BrainFlow + LSL** as the primary host protocol, with Cyton-compatible binary as a secondary compatibility shim? (Recommend: yes.)

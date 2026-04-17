@@ -198,9 +198,69 @@ BrainProducts      & actiCHamp / actiCAP            & 256 & 2000s-      & BrainV
 ANT Neuro          & eego / Waveguard               & 256 & 2000s-      & Belt-pack amp + dry-alt caps \\
 Compumedics Neuroscan & SynAmps2 / SynAmpsRT        & 512 & 2000s-      & Clinical mainstay \\
 g.tec              & g.USBamp / g.Nautilus          & 256 & 2000s-      & Modular headbox \\
+\textbf{g.tec}     & \textbf{g.Pangolin / g.HIamp (4$\times$)} & \textbf{1024} & \textbf{2023-} & \textbf{VHD-EEG SOTA} — flex-PCB active-wet grids; 8.6 mm spacing; 95.2\% CS localization vs ECoG \citep{schreiner2024pangolin} \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsection{The very-high-density frontier --- g.Pangolin and 1024-channel EEG}
+\label{sec:vhd}
+
+A second revolution has been quietly underway since roughly 2020: the
+move from ``HD-EEG'' (64--128 channels) to \emph{ultra- or very-high-
+density EEG} (VHD-EEG / uHD-EEG, 256--1024$+$ channels). The theoretical
+driver is a refinement of Nunez's spatial-Nyquist argument ---
+Grover and Venkatesh (cited in Schreiner et~al.\ 2024) propose, on
+information-theoretic grounds, that the scalp's spatial bandwidth
+demands not hundreds but \emph{thousands} of electrode positions to
+capture all of the information it carries.
+
+The state-of-the-art commercial VHD system is \textbf{g.tec's
+g.Pangolin}~\citep{schreiner2024pangolin}, a 1024-channel-capable
+uHD-EEG platform operating at a 256-channel density in the published
+demonstration. Key specifications:
+
+\begin{itemize}[leftmargin=*]
+\item Up to \textbf{1024 channels} via four g.HIamp 256-channel amplifiers.
+\item Flexible printed-circuit electrode grids of 16 channels each, with
+gold-plated electrode points arranged at \textbf{8.6 mm inter-electrode
+distance} and \textbf{5.9 mm electrode diameter}.
+\item An \textbf{active pre-amplifier per grid} (fixed gain 10) before
+the back-end g.HIamp.
+\item Wet electrodes with conductive paste (Elefix) under an adhesive
+layer designed to prevent bridging and crosstalk.
+\item 24-bit ADC resolution, up to 38.4 kHz sample rate per channel.
+\item Authors of Schreiner et~al.\ (2024) include Christoph Guger
+(founder of g.tec) among g.tec-affiliated researchers.
+\end{itemize}
+
+Schreiner et~al.\ use this system at 256-channel density to demonstrate
+\textbf{95.2\% classification accuracy} of channels as anterior or
+posterior to the central sulcus via somatosensory-evoked-potential
+phase-reversal analysis --- a level of functional precision previously
+only achievable with surgically implanted ECoG.
+
+Closely related theoretical and methodological work includes Shirazi,
+Onton \& Makeig (2025)~\citep{shirazi2025scalp}, who simulate scalp EEG
+from ultra-high-density ECoG to quantify cortex-to-scalp projection
+patterns; Liu et~al.\ (2018)~\citep{liu2018density}, who establish the
+systematic benefits of density, head modeling, and source localization
+for reconstructing large-scale brain networks; and Fiedler
+et~al.\ (2022)~\citep{fiedler2022256dry}, whose 256-channel dry cap
+covers the dry-electrode side of the VHD spectrum.
+
+\paragraph{Where \freeeeg{} sits in this landscape.} We are deliberately
+\emph{not} claiming VHD-EEG status. The open-hardware frontier at 256$+$
+channels remains commercial-only as of April 2026. \freeeeg{} occupies
+the ``affordable mid-density open-hardware'' niche: higher channel count
+than OpenBCI (8--16) and Open Ephys~+~EEG / Black 2017 (64--128), lower
+than g.Pangolin (1024), at roughly one to two orders of magnitude lower
+cost than the commercial systems at comparable channel counts. A natural
+upgrade path (``FreeEEG256'') on the same STM32H743 + ADS131M08 chassis
+is plausible --- thirty-two ADCs across six SPI buses plus a second-
+stage cable design --- and would put open hardware meaningfully closer
+to the VHD threshold, but that is explicitly not within the present
+roadmap.
 
 \subsection{The open-hardware generation}
 
@@ -728,11 +788,11 @@ boards <- data.frame(
   name = c("OpenBCI\nCyton","OpenBCI\nGanglion","HackEEG",
            "PiEEG-16","IronBCI","Neurogate\nOctaFlow",
            "BIOADC","FreeEEG32\nbeta","Open Ephys\n+ EEG",
-           "FreeEEG128\n(this work)"),
-  channels = c(8, 4, 32, 16, 8, 8, 32, 32, 128, 128),
-  price    = c(1000, 500, 450, 600, 300, 200, 400, 500, 3000, 900),
-  res      = c(24, 24, 24, 24, 24, 24, 24, 24, 16, 24),
-  pch      = c(1, 1, 1, 1, 1, 1, 1, 1, 2, 19)
+           "FreeEEG128\n(this work)","g.Pangolin\n(VHD SOTA)"),
+  channels = c(8, 4, 32, 16, 8, 8, 32, 32, 128, 128, 1024),
+  price    = c(1000, 500, 450, 600, 300, 200, 400, 500, 3000, 900, 100000),
+  res      = c(24, 24, 24, 24, 24, 24, 24, 24, 16, 24, 24),
+  pch      = c(1, 1, 1, 1, 1, 1, 1, 1, 2, 19, 17)
 )
 op <- par(mar=c(4.2, 4.2, 0.5, 0.5), cex=0.85)
 plot(boards$price, boards$channels,
@@ -740,23 +800,27 @@ plot(boards$price, boards$channels,
      xlab="Estimated BOM / retail cost (USD, log scale)",
      ylab="Channel count (log scale)",
      pch=boards$pch, cex=1.6,
-     xlim=c(150, 5000), ylim=c(3, 200))
+     xlim=c(150, 200000), ylim=c(3, 2000))
 text(boards$price, boards$channels, labels=boards$name, pos=4, offset=0.6, cex=0.7)
 abline(h=128, lty=3, col="gray50")
+abline(h=256, lty=3, col="gray70")
 legend("bottomleft",
-       legend=c("Other open HW","Open Ephys + EEG (Black 2017)","FreeEEG128"),
-       pch=c(1, 2, 19), bty="n", cex=0.8)
+       legend=c("Other open HW","Open Ephys + EEG (Black 2017)","FreeEEG128","g.Pangolin VHD SOTA"),
+       pch=c(1, 2, 19, 17), bty="n", cex=0.8)
 par(op)
 @
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.95\textwidth]{paper-landscape-plot}
-\caption{Open-hardware EEG landscape on the channel-count vs.\ cost plane.
-\freeeeg{} and Open Ephys~+~EEG (Black et~al.\ 2017) are the only
-128-channel entries; \freeeeg{} achieves this at approximately one-third
-the cost and with \mbox{24-bit} ADC resolution versus the Intan RHD
-family's 16-bit.}
+\caption{Open-hardware EEG landscape on the channel-count vs.\ cost plane,
+with g.Pangolin~\citep{schreiner2024pangolin} added as the commercial
+VHD-EEG state-of-the-art reference point.
+\freeeeg{} and Open Ephys~+~EEG (Black et~al.\ 2017) are the
+only 128-channel open entries; \freeeeg{} achieves this at approximately
+one-third the cost of Open Ephys~+~EEG and with 24-bit ADC resolution
+versus the Intan RHD family's 16-bit. g.Pangolin demonstrates the
+VHD-EEG frontier at roughly $10^2$--$10^3$ times the cost.}
 \label{fig:landscape}
 \end{figure}
 

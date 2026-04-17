@@ -111,6 +111,12 @@ BCI hardware landscape.
 
 [A6] Pflieger, M.E. & Sands, S.F. 256-channel ERP information growth. *NeuroImage* **3**(3 Suppl.), S10 (1996). doi:10.1016/S1053-8119(96)80012-7. *Primary source for the **first 256-channel EEG system**, built at Neuroscan by Pflieger and Sands as principals.*
 
+[A7] Schreiner, L., Jordan, M., Sieghartsleitner, S., Kapeller, C., Pretl, H., Kamada, K., Asman, P., Ince, N.F., Miller, K.J. & Guger, C. Mapping of the central sulcus using non-invasive ultra-high-density brain recordings. *Scientific Reports* **14**, 6527 (2024). doi:10.1038/s41598-024-57167-y. ***Primary paper for the g.tec g.Pangolin VHD-EEG system*** (up to 1024 channels, 8.6 mm inter-electrode, 5.9 mm diameter, flex-PCB active-wet grids, 24-bit / up to 38.4 kHz via g.HIamp). Demonstrates 95.2% anterior/posterior-to-CS classification by SSEP phase reversal — comparable to invasive ECoG.
+
+[A8] Shirazi, S.Y., Onton, J. & Makeig, S. Simulating scalp EEG from ultrahigh-density ECoG data illustrates cortex to scalp projection patterns. *bioRxiv* 2025.06.24.660870 (2025). doi:10.1101/2025.06.24.660870. *Cortex-to-scalp projection simulations motivating the VHD-EEG density case.*
+
+[A9] Liu, Q., Ganzetti, M., Wenderoth, N. & Mantini, D. Detecting Large-Scale Brain Networks Using EEG: Impact of Electrode Density, Head Modeling and Source Localization. *Frontiers in Neuroinformatics* **12**, 4 (2018). doi:10.3389/fninf.2018.00004. *Systematic study of density × head-model × source-localization interaction for network reconstruction.*
+
 [1] Siegle, J.H. et al. Open Ephys: an open-source, plugin-based platform for multichannel electrophysiology. *J. Neural Eng.* **14**, 045003 (2017). doi:10.1088/1741-2552/aa5eea.
 
 [2] de Sousa, B.M. et al. An open-source, ready-to-use and validated ripple detector plugin for the Open Ephys GUI. *bioRxiv* 2022.04.01.486754 (2022). doi:10.1101/2022.04.01.486754.

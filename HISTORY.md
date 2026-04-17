@@ -96,6 +96,7 @@ The direct ancestor of the FreeEEG128 design philosophy.
 | ANT Neuro | eego / Waveguard | up to 256 | 2000s- | Belt-pack amp + dry-alt caps. |
 | Compumedics Neuroscan | SynAmps2 / SynAmps RT | up to 512 | 2000s- | Research / clinical mainstay. |
 | g.tec | g.USBamp / g.Nautilus | up to 256 | 2000s- | Modular headbox design. |
+| **g.tec** | **g.Pangolin / g.HIamp** | **up to 1024** | **2023-** | **VHD-EEG state-of-the-art.** Flex-PCB active-wet electrode grids, 8.6 mm spacing. 256-ch density achieves 95.2% CS localization vs invasive ECoG (Schreiner et al. 2024). |
 
 Common themes of this era that our project inherits or explicitly moves past:
 
@@ -105,6 +106,58 @@ Common themes of this era that our project inherits or explicitly moves past:
 - **Per-channel impedance + reference flexibility** become standard — table stakes for the beta.
 
 ---
+
+## 4b. The very-high-density frontier — g.Pangolin and 1024-channel EEG (2020s)
+
+A second revolution has been quietly underway since roughly 2020: the move
+from "HD-EEG" (64-128 channels) to **ultra- or very-high-density EEG**
+(VHD-EEG / uHD-EEG, 256-1024+ channels). The theoretical driver is a
+refinement of Nunez's spatial-Nyquist argument — Grover and Venkatesh
+(cited in Schreiner et al. 2024) propose on information-theoretic grounds
+that the scalp's spatial bandwidth demands not hundreds but *thousands*
+of electrode positions to capture all of the information it carries.
+
+The **state-of-the-art commercial VHD system is g.tec's g.Pangolin** — a
+1024-channel-capable uHD-EEG platform that Schreiner et al. (2024,
+*Scientific Reports*) use to demonstrate non-invasive central-sulcus
+mapping at intracranial-comparable accuracy. Key specifications:
+
+- **Up to 1024 channels** via 4× g.HIamp 256-channel amplifiers
+- **8.6 mm inter-electrode distance**, **5.9 mm electrode diameter**
+- **Flexible printed-circuit electrode grids** (16 channels per grid) with
+  gold-plated electrode points
+- **Active pre-amplifier** per grid (fixed gain 10) before the g.HIamp
+- **Wet electrodes** with conductive paste (e.g., Elefix) applied under an
+  adhesive layer designed to prevent bridging and crosstalk
+- **24-bit ADC resolution, up to 38.4 kHz sample rate per channel**
+- Authors of Schreiner et al. 2024 include **Christoph Guger** (founder of
+  g.tec) among g.tec-affiliated researchers
+
+The Schreiner et al. study demonstrates that the g.Pangolin at 256-channel
+density can **classify channels as anterior or posterior to the central
+sulcus with 95.2% accuracy using SSEP phase-reversal analysis** — a level
+of functional precision previously only achievable with surgically
+implanted ECoG.
+
+Closely related theoretical and methodological work includes Shirazi,
+Onton & Makeig (2025, *bioRxiv*), who simulate scalp EEG from
+ultra-high-density ECoG to quantify cortex-to-scalp projection; and Liu
+et al. (2018, *Frontiers in Neuroinformatics*), who establish the
+systematic benefits of density, head modeling, and source localization
+for reconstructing large-scale brain networks. Fiedler et al.'s
+256-channel dry cap (2022, *Human Brain Mapping*) covers the
+dry-electrode side of the VHD spectrum.
+
+**Where FreeEEG128 sits in this landscape.** We are deliberately not
+claiming VHD-EEG status — the open-hardware frontier at 256+ channels
+remains commercial-only as of April 2026. FreeEEG128 occupies the
+"affordable mid-density open-hardware" niche: higher channel count than
+OpenBCI (8-16) and Open Ephys + EEG / Black 2017 (64-128), lower than
+g.Pangolin (1024), at roughly one to two orders of magnitude lower cost
+than commercial HD systems. A natural upgrade path (`FreeEEG256`) on the
+same STM32H743 + ADS131M08 chassis is plausible — 32 ADCs across six SPI
+buses plus a second-stage cable design — and would put open hardware
+meaningfully closer to the VHD threshold.
 
 ## 5. The open-hardware generation (2010s-)
 
