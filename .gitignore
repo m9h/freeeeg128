@@ -1,0 +1,35 @@
+# Upstream repos — referenced, not redistributed
+firmware-freeeeg128-alpha/
+firmware-stm32cubeide-1.5.1/
+cap-free-dry-electrodes/
+
+# Sweave / LaTeX build artefacts (paper.pdf is committed; intermediates are not)
+paper/paper.tex
+paper/paper.log
+paper/paper.aux
+paper/paper.blg
+paper/paper.bbl
+paper/paper.out
+paper/paper.toc
+paper/Rplots.pdf
+paper/paper-landscape-plot.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Benchmark results are run-specific
+host/results/bench-*.csv
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~

@@ -1,0 +1,837 @@
+\documentclass[11pt,letterpaper]{article}
+
+% ---------------------------------------------------------------------------
+% packages
+% ---------------------------------------------------------------------------
+\usepackage[margin=1in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multicol}
+\usepackage{authblk}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{siunitx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, shapes, positioning, calc, fit, backgrounds}
+\usepackage{natbib}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  citecolor=blue!60!black,
+  urlcolor=blue!60!black,
+  pdftitle={FreeEEG128: Design and Roadmap for an Open-Hardware 128-Channel EEG Acquisition System},
+  pdfauthor={Morgan Hough}
+}
+
+\bibliographystyle{unsrtnat}
+
+\newcommand{\freeeeg}{FreeEEG128}
+\newcommand{\fw}{\texttt{firmware-stm32cubeide-1.5.1}}
+
+% ---------------------------------------------------------------------------
+% title
+% ---------------------------------------------------------------------------
+\title{\freeeeg{}: Design and Roadmap for an\\
+  Open-Hardware 128-Channel {EEG} Acquisition System\\
+  \large Historical lineage, current-state audit, and alpha/beta plan}
+
+\author[1]{Morgan Hough}
+\affil[1]{Independent researcher. Formerly: first software engineering manager,
+  Electrical Geodesics, Inc.\ (EGI), 1990s.\\
+  \texttt{morgan.hough@gmail.com}}
+
+\date{April 2026}
+
+% ---------------------------------------------------------------------------
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+We present the design state, hardware audit, and alpha-to-beta development
+roadmap of \freeeeg{}, an open-hardware 128-channel scalp
+electroencephalography acquisition system evolving the NeuroIDSS
+\freeeeg{}-alpha platform. The alpha board pairs an STMicroelectronics
+STM32H743ZI Cortex-M7 microcontroller with sixteen Texas Instruments ADS131M08
+24-bit delta-sigma ADCs distributed across six SPI buses, a timer/DMA cascade
+providing sample-synchronous chip-select pulses, and a medical-grade digital-
+and power-isolation barrier between subject and host. The accompanying cap
+carries 130 dry Ag/AgCl passive electrodes on a 10/5 textile scaffold. We
+situate the design in the lineage running from Nunez's biophysical framework
+through Gevins' real-time cognitive-state engineering, Tucker's Geodesic
+Sensor Net at Electrical Geodesics, Inc., and the active-electrode
+breakthrough at BioSemi; and we identify Black et~al.\ 2017 (Open Ephys +
+EEG) as the primary feature-for-feature comparison benchmark. We audit the
+alpha board's peripheral inventory, flag the shortcomings of the stock
+firmware, and present a phased firmware rewrite (packet-format freeze,
+modular driver layer, first-class impedance mode, device-side timestamping,
+watchdog and DFU support). We commit to a belt-pack wearable form factor
+with a cap-mounted passive brain-box; reject the STM32MP2 upgrade path due
+to battery-weight and EMI regressions; and plan an ESP32-S3 co-processor on
+a beta revision for CircuitPython-compatible networking, LSL/WebSocket
+delivery, and an Adafruit-ecosystem surface. Validation against the Black
+et~al.\ eyes-closed alpha-vs-actiCHamp protocol is proposed as the beta
+acceptance gate, with integrations targeted for Open Ephys GUI, MNE-CPP,
+and BrainFlow on day one.
+\end{abstract}
+
+\tableofcontents
+\vspace{1em}
+
+% ===========================================================================
+\section{Introduction}
+% ===========================================================================
+
+High-density electroencephalography was born from three simultaneous mid-1990s
+breakthroughs: Paul Nunez's biophysical account of scalp potentials and the
+corresponding Nyquist-style argument for densely sampling the
+head~\citep{nunez1981electric,nunez1994laplacian}; Alan Gevins' real-time
+cognitive-state engineering practice; and the first commercial 256-channel
+EEG system, built at Neuroscan by Pflieger and Sands~\citep{pflieger1996256},
+followed rapidly by the second 256-channel system at Electrical Geodesics,
+Inc.~(EGI), which commercialized Tucker's Geodesic Sensor
+Net~\citep{tucker1993geodesic}. Three decades later, academic and clinical
+high-density EEG remains dominated by a handful of closed-ecosystem vendors
+(BioSemi, Brain Products, ANT Neuro, Compumedics Neuroscan, g.tec,
+NA300/GTEN, etc.), and the open-hardware movement has only recently
+approached 100-channel counts.
+
+The open-hardware track itself has matured quickly. OpenBCI~(2014) made
+8-channel ADS1299 acquisition routinely accessible; Open Ephys (Siegle
+et~al.\ 2017~\citep{siegle2017openephys}) generalized 512-channel
+multichannel electrophysiology via a plugin GUI; Black et~al.\
+2017~\citep{black2017openephyseeg} adapted that platform to 128-channel
+human EEG and validated it side-by-side against a BrainVision actiCHamp
+clinical amplifier. More recent entries --- PiEEG, IronBCI, HackEEG, BIOADC,
+Neurogate~OctaFlow --- cover an expanding range of channel counts, packaging,
+and wireless protocols, but none have delivered 128-channel density with
+full medical-grade isolation, free licensing of both firmware and hardware,
+and first-class support for the full open real-time stack (Open Ephys GUI +
+MNE-CPP + BrainFlow + LSL + BIDS-EEG).
+
+\freeeeg{} aims at that gap. The alpha revision (NeuroIDSS, Vivancos 2023
+\citep{vivancos2023mindbigdata}) exists as fewer than five physical units
+worldwide. One is on the author's bench; the present paper describes the
+design audit, the firmware-rewrite roadmap, and the planned beta revision.
+
+% ===========================================================================
+\section{Historical lineage}
+% ===========================================================================
+
+\subsection{Theoretical foundations --- Nunez}
+
+Nunez's book \textit{Electric Fields of the Brain}~\citep{nunez1981electric}
+(second edition with Srinivasan~\citep{nunez2006electric}) remains the
+canonical biophysical reference. Three arguments continue to shape hardware
+design: (i)~scalp potential is spatially low-pass-filtered relative to
+cortical sources, with the skull acting as a \SIrange{2}{3}{\centi\metre}
+smoothing kernel; (ii)~reference electrode choice is not neutral, and
+software-defined referencing (surface Laplacian, average reference) is
+required for source-localization work~\citep{nunez1994laplacian}; and
+(iii)~volume conduction ensures that no scalp sensor sees a single
+source. Each of these motivates the channel-count race of the 1990s: below
+roughly 64 electrodes the surface-Laplacian math does not pay off.
+
+\subsection{Engineering pioneer --- Gevins}
+
+Alan Gevins founded EEG Systems Laboratory~(1980) and SAM Technology~(1986),
+and by the early 1990s had pushed EEG hardware practice toward 64 and 128
+channels with sustained real-time cognitive-state analysis. His
+``deblurring'' methods, combining MRI-derived geometry with scalp EEG to
+estimate cortical-surface potential~\citep{gevins1997working}, predate
+modern source localization and established the protocol templates for
+sustained-attention and mental-workload studies that the field still uses.
+
+\subsection{Engineering breakthrough --- Tucker and EGI}
+
+Don Tucker's Geodesic Sensor Net~\citep{tucker1993geodesic}, commercialized
+as Electrical Geodesics, Inc., is the direct ancestor of the \freeeeg{}
+form factor. The saline-sponge electrode array on a tension-distributed
+elastic polymer scaffold solved the practical application-workflow problem
+that had made high-density EEG impractical outside specialist labs:
+application time dropped from \mbox{60+ minutes} (paste-based) to
+approximately five minutes. EGI built the \emph{second} 256-channel EEG
+system in the world; the present author served as its first software
+engineering manager during the mid-1990s. Ramesh Srinivasan, Nunez's
+co-author on the second edition of \textit{Electric Fields of the
+Brain}~\citep{nunez2006electric} and now Professor of Cognitive Sciences
+and Biomedical Engineering at UC~Irvine, was an early member of EGI, which
+is why EGI's product line shipped with surface-Laplacian and average-
+reference montaging as first-class software features from the start.
+
+\subsection{The commercial high-density era}
+
+Table~\ref{tab:commercial} summarizes the commercial high-density
+landscape. Common themes that \freeeeg{} inherits, or explicitly moves
+past, include a pervasive reliance on proprietary caps, connectors, amps,
+and software; the emergence of belt-pack amps (ANT, BrainProducts LiveAmp)
+after a decade of desk-tethered designs; the \emph{first} high-density
+active-electrode system at BioSemi in the late 1990s, which remains the
+standard against which movement-tolerant recording is measured; and the
+eventual standardization of per-channel impedance-check and reference-
+flexibility as table-stakes features.
+
+\begin{table}[h]
+\centering\small
+\caption{Representative commercial high-density EEG vendors. Channel counts
+are the maxima offered; years are approximate first-introduction.}
+\label{tab:commercial}
+\begin{tabular}{llrll}
+\toprule
+Vendor & System & Max ch & Era & Notable feature \\
+\midrule
+Neuroscan          & SynAmps / Quik-Cap             & 256 & early 1990s & First 256-ch system \citep{pflieger1996256} \\
+EGI                & Net Amps / Geodesic Sensor Net & 256 & 1992-      & Saline-sponge quick-apply cap \\
+BioSemi            & ActiveTwo                      & 256 & late 1990s- & First HD-EEG with active electrodes \\
+BrainProducts      & actiCHamp / actiCAP            & 256 & 2000s-      & BrainVision Recorder ecosystem \\
+ANT Neuro          & eego / Waveguard               & 256 & 2000s-      & Belt-pack amp + dry-alt caps \\
+Compumedics Neuroscan & SynAmps2 / SynAmpsRT        & 512 & 2000s-      & Clinical mainstay \\
+g.tec              & g.USBamp / g.Nautilus          & 256 & 2000s-      & Modular headbox \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The open-hardware generation}
+
+\freeeeg{} sits at the current frontier of open-hardware EEG.
+Section~\ref{sec:related} presents the feature-level comparison in detail.
+
+% ===========================================================================
+\section{Related open-hardware work}
+\label{sec:related}
+% ===========================================================================
+
+Table~\ref{tab:landscape} enumerates the open-hardware EEG projects relevant
+to \freeeeg{}. Two observations matter for design decisions. First, no
+existing open-hardware project reaches 128 channels without compromising
+on either licensing (Black et~al.\ 2017 is CC-BY-NC-SA 3.0 IGO, restricting
+commercial use) or form factor (every 128+~ch system is desk-tethered
+rather than wearable). Second, the industry-default single-chip ADC for
+these projects is the Texas Instruments ADS1299 (eight channels, 24~bit);
+\freeeeg{}-alpha instead uses sixteen ADS131M08s, inheriting the
+FreeEEG32-beta demonstration that this chip family achieves research-grade
+noise performance at lower cost.
+
+\begin{table}[h]
+\centering\scriptsize
+\caption{Open-hardware EEG boards relevant to \freeeeg{}. ``Ch'' = channels;
+``Res'' = ADC resolution in bits; ``SR'' = maximum sample rate.}
+\label{tab:landscape}
+\begin{tabular}{llllrrrll}
+\toprule
+Project & MCU & ADC & Ch & Res & SR (Hz) & Host I/F & License & Lineage / note \\
+\midrule
+OpenBCI Cyton        & PIC32MX       & ADS1299     & 8 (16 w/ Daisy) & 24 & 250 & BLE+USB & MIT & Reference packet format \\
+OpenBCI Ganglion     & nRF51822      & MCP3912     & 4      & 24 & 200 & BLE       & MIT        & BLE-direct \\
+OpenBCI Galea        & i.MX RT1062   & multi-1299  & 8 + aux & 24 & 500 & USB-C     & closed HW  & Multimodal in HMD \\
+HackEEG              & SAM3X8E (Due) & ADS1299     & 8--32  & 24 & 16\,k & USB      & MIT        & JSONLines/MessagePack dual \\
+PiEEG                & Pi SPI-HAT    & ADS1299     & 8 / 16 & 24 & 500 & (host Pi) & GPL-3.0    & Host-as-MCU pattern \\
+IronBCI              & STM32F4       & ADS1299     & 8      & 24 & 500 & USB + BLE & GPL-3.0    & Validated vs BioSemi \\
+BIOADC               & PIC32         & ADS1299     & 32     & 24 & 500 & USB       & CC         & Full open schematic \citep{gargiulo2019bioadc} \\
+Neurogate OctaFlow   & ESP32-C3      & ADS1299     & 8      & 24 & 4\,k & USB + Wi-Fi & open   & Adafruit-ecosystem MCU \\
+FreeEEG32-beta       & STM32F4       & 4$\times$ADS131M08 & 32 & 24 & 2\,k & USB  & AGPL-3.0   & ADS131M08 proving ground \\
+Open Ephys + EEG     & Opal Kelly FPGA & Intan RHD2132/2164 & up to 128 & 16 & 30\,k & USB 3.0 & CC-BY-NC-SA 3.0 IGO & Black et~al.\ 2017 \citep{black2017openephyseeg} \\
+\textbf{\freeeeg{}}  & STM32H743ZI   & 16$\times$ADS131M08 & 128 & \textbf{24} & 32\,k cap & USB-CDC (FS) & AGPL-3.0 + CERN-OHL-S (planned) & this work \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---------------- primary comparison: Black 2017 ------------------------
+
+\subsection{Primary benchmark: Black et~al.\ 2017}
+
+Black et~al.~\citep{black2017openephyseeg} adapt commercial EEG caps onto the
+Open Ephys acquisition board via a custom breakout-to-Omnetics-to-Intan-
+headstage chain. The abstract reports: \emph{``The Open Ephys + EEG system
+can record reliable human EEG data, as well as human EMG data. A
+side-by-side comparison of eyes closed 8--14 Hz activity between the Open
+Ephys + EEG system and the Brainvision ActiCHamp EEG system showed similar
+average power and signal to noise.''} Three consequences for \freeeeg{}
+design follow directly:
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Validation protocol}. Eyes-closed 8--14\,Hz alpha power and
+SNR, side-by-side against a BrainVision actiCHamp clinical amplifier, is
+the \emph{minimum} bar to call anything ``beta.'' We adopt it verbatim as
+the \freeeeg{}-beta acceptance gate (Section~\ref{sec:validation}).
+\item \textbf{Commercial-cap adapter pathway}. Their breakout-PCB model is a
+template for a sister \freeeeg{}-amp variant that accepts any commercial
+EasyCap-class cap. Worth prototyping after the beta lands.
+\item \textbf{Plugin-GUI integration}. Their stack is native to the Open
+Ephys GUI. We plan an equivalent acquisition plugin for \freeeeg{}, and
+the corresponding native plugin for MNE Scan (Section~\ref{sec:apps}).
+\end{itemize}
+
+Table~\ref{tab:vs-black} gives the feature-level comparison.
+
+\begin{longtable}{p{0.25\textwidth}p{0.33\textwidth}p{0.33\textwidth}}
+\caption{\freeeeg{} vs Open Ephys + EEG (Black et~al.\ 2017)} \label{tab:vs-black}\\
+\toprule
+\textbf{Axis} & \textbf{Open Ephys + EEG} & \textbf{\freeeeg{}} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Axis} & \textbf{Open Ephys + EEG} & \textbf{\freeeeg{}} \\
+\midrule
+\endhead
+ADC / amplifier & Intan RHD2132 / RHD2164 bioamp, 16-bit SPI & 16$\times$ TI ADS131M08, \textbf{24-bit} $\Delta\Sigma$ \\
+Channels        & 32 / 64 / up to 128 (2$\times$RHD2164); board max 512 & 128 fixed \\
+Sample rate     & Configurable to 30\,kHz (Intan max) & 250\,Hz firmware default; chip supports up to $\sim$32\,kSPS \\
+Resolution      & 16 bits & \textbf{24 bits} \\
+Input-ref noise & $\sim$2.4 \textmu V RMS (Intan RHD spec) & $\sim$0.5 \textmu V RMS over 250\,Hz BW at gain 32 \\
+Acq. board      & Open Ephys board: Opal Kelly XEM-6310 FPGA, USB 3.0 & Custom \freeeeg{} PCB: STM32H743ZI + on-board ADS131M08 bank; no FPGA \\
+Host interface  & USB 3.0 from Open Ephys board & USB-CDC (FS, via ADuM3160); beta adds Wi-Fi/BLE via ESP32-S3 \\
+Cap / electrodes& Commercial EasyCap-class via custom breakout$\to$Omnetics$\to$RHD headstage & Open-hardware 130-electrode dry Ag/AgCl cap; cap is part of the project \\
+Reference / gnd & Configurable via breakout & CP1 = ref, CP2 = gnd (hardwired at alpha) \\
+Isolation       & Partial; Open Ephys board is USB-mains-referenced unless isolated upstream & \textbf{Full medical-grade} on-board: ADuM3160 + ADuM1402 + 2$\times$ ISO7341C + SN6505B+xfmr \\
+Form factor     & Desk / rack & \textbf{Belt-pack wearable} (Section~\ref{sec:enclosure}) \\
+Stimulus sync   & 8 DI + 8 DO + 8 ADC + 8 DAC on Open Ephys board & Currently none; beta plan = TTL via ADuM1402 spare lane + Labstreamer \\
+Total cost est. & $\sim$USD 2000--3500 & \textbf{$\sim$USD 500--1000} BOM \\
+License         & CC-BY-NC-SA 3.0 IGO (non-commercial) & AGPL-3.0 firmware + CERN-OHL-S-v2 hardware (planned) \\
+\bottomrule
+\end{longtable}
+
+% ===========================================================================
+\section{System architecture}
+% ===========================================================================
+
+\subsection{Alpha board overview}
+
+Figure~\ref{fig:alpha-arch} diagrams the alpha acquisition chain. One hundred
+thirty passive dry Ag/AgCl electrodes on a 10/5-system textile cap
+(DC resistance $\leq$ 500~$\Omega$, 12~mm diameter, multi-prong) terminate
+in 1.5~mm DIN touch-proof plugs that mate into a custom passive brain-box.
+The brain-box fans the 128 channels (128 signal + CP1 reference + CP2
+ground) into sixteen Texas Instruments ADS131M08 $\Delta\Sigma$
+ADCs~\citep{ti_ads131m08}, eight channels per chip, arranged with a
+deliberately scrambled mapping that assigns topographically distant
+electrodes to the same ADC package in order to maximize across-ADC
+signal independence. The ADCs run at gain 32, reference voltage 1.25~V,
+and an on-board firmware-configured sample rate of 250~Hz.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  node distance=5mm,
+  box/.style={draw, rounded corners=2pt, minimum height=7mm, align=center, font=\small},
+  iso/.style={box, fill=yellow!10},
+  host/.style={box, fill=blue!10},
+  capsty/.style={box, fill=green!10}
+]
+\node[capsty] (electrodes) {130 dry Ag/AgCl\\(10/5 cap, passive)};
+\node[capsty, right=of electrodes] (brainbox) {Brain-box\\(passive fan-out)};
+\node[iso, right=of brainbox] (adc) {16$\times$ ADS131M08\\24-bit $\Delta\Sigma$, gain 32};
+\node[iso, right=of adc] (mcu) {STM32H743ZI\\M7 @ 480\,MHz};
+\node[iso, below=of mcu] (sdmmc) {microSD\\(SDMMC1 + FatFS)};
+\node[iso, below=of adc] (imu) {LSM6DS3\\(I$^2$C IMU)};
+\node[iso, below=of electrodes, xshift=15mm] (barrier) {isolation barrier:\\ADuM3160 USB, ADuM1402 UART,\\2$\times$ ISO7341C SPI, SN6505B DC-DC};
+\node[host, right=of mcu] (host) {Host PC\\(USB-CDC, macOS / Linux)};
+
+\draw[-{Stealth}] (electrodes) -- node[above,font=\scriptsize]{1.5\,mm DIN} (brainbox);
+\draw[-{Stealth}] (brainbox) -- node[above,font=\scriptsize]{0.6\,mm shielded} (adc);
+\draw[-{Stealth}] (adc) -- node[above,font=\scriptsize]{6 SPI buses} (mcu);
+\draw[-{Stealth}] (mcu) -- (host);
+\draw[-{Stealth}] (mcu) -- (sdmmc);
+\draw[-{Stealth}] (imu) -- (mcu);
+
+\begin{pgfonlayer}{background}
+  \node[draw=yellow!50!black, dashed, rounded corners=5pt, inner sep=4mm, fit=(adc)(mcu)(imu)(sdmmc)] {};
+\end{pgfonlayer}
+\end{tikzpicture}
+\caption{\freeeeg{}-alpha acquisition chain. The dashed boundary delimits the
+galvanically isolated patient-side subsystem; USB and programming interfaces
+cross the barrier via digital isolators (ADuM), while power crosses via a
+push-pull transformer DC-DC.}
+\label{fig:alpha-arch}
+\end{figure}
+
+\subsection{Microcontroller and clocking}
+
+The STM32H743ZI~\citep{st_stm32h743} (Cortex-M7 at 480~MHz, 2~MB flash,
+1~MB SRAM, double-precision FPU) is the correct choice for this system and
+is retained across the alpha$\to$beta transition (Section~\ref{sec:mcu}).
+Three capabilities explain why no other microcontroller in the
+Adafruit-supported ESP32 lineage or the Cortex-M4 cost-down tiers would
+work: (i)~six independent SPI peripherals, required to read sixteen
+ADS131M08s without daisy-chain penalties; (ii)~a TIM1/TIM8 cascade routed
+through DMA in circular mode onto a GPIO port, generating
+sample-synchronous chip-select pulses across all sixteen chips with zero
+CPU involvement; and (iii)~a radio-quiet substrate and low-jitter clock
+tree adjacent to a 24-bit $\Delta\Sigma$ analog front-end.
+
+An external FXO-SM7 oscillator drives the ADC master clock. The STM32's
+HSE is a 16~MHz crystal and an LSE 32.768~kHz crystal is populated for
+RTC use (currently unused by the stock firmware).
+
+\subsection{Isolation and power}
+
+The board implements a textbook medical-isolation topology. On the digital
+side, an Analog Devices ADuM3160 full-speed USB isolator gates the host
+link; an ADuM1402BRWZ quad digital isolator handles the SPI/UART path to
+the programming headers; and two ISO7341C 3-channel isolators sit on the
+SPI fabric that reaches the ADC bank. On the power side, a Texas
+Instruments SN6505B push-pull transformer driver feeds a W\"urth
+750315371 transformer, producing the isolated 5~V analog island; this
+is then regulated by three Texas Instruments LP5907 ultra-low-noise LDOs
+(6.5~\textmu V~RMS, $\sim$82~dB PSRR at 1~kHz) generating AVDD, VDD,
+and IOVDD, with an Analog Devices ADP7118 serving as an alternate
+high-PSRR LDO. Voltage references are supplied by a REF2025 (ADC Vref)
+and an ADR4525 (precision reference). The upstream USB rail is
+deliberately a \emph{non-critical} rail, which is why the stock
+firmware can operate adequately from a consumer USB power bank.
+
+\subsection{Peripheral-by-peripheral audit}
+
+Table~\ref{tab:peripherals} summarizes the STM32 peripherals presently
+configured in the stock firmware's \texttt{.ioc} file, cross-referenced
+against \texttt{Src/main.c:2237--2255}. Notable findings for the
+firmware rewrite include: (i) the D-Cache is disabled, a workaround for
+cached DMA-buffer staleness which we will replace with an MPU-backed
+non-cacheable region; (ii) the \texttt{.ioc} simultaneously configures
+\texttt{USB\_DEVICE} and \texttt{USB\_OTG\_HS}, with the virtual-pin
+assignment labeling the device \texttt{VS\_USB\_DEVICE\_CDC\_HS}, but
+PB14/PB15 are set to \texttt{Device\_Only\_FS}\,---\,an HS-versus-FS
+conflict that will be resolved by locking to FS because the ADuM3160
+isolator is full-speed only; (iii) legacy \texttt{ad7779.c/h} files from
+the FreeEEG32 predecessor remain in the tree, and commented-out W5500
+(WIZnet SPI-to-Ethernet) bring-up code from FreeSmartEEG is present but
+unused; and (iv) neither the IWDG watchdog nor the RTC is initialized,
+despite the LSE crystal being populated.
+
+\begin{table}[h]
+\centering\small
+\caption{Stock-firmware peripheral inventory (from \texttt{.ioc} and
+\texttt{main.c}).}
+\label{tab:peripherals}
+\begin{tabular}{lll}
+\toprule
+STM32 IP & Allocation & DMA \\
+\midrule
+SPI1 -- SPI6 (six buses) & ADS131M08 bank & SPI2/3/4/5 via DMA1/2 \\
+I$^2$C1 & LSM6DS3 IMU & -- \\
+I$^2$C2 & spare & -- \\
+SDMMC1  & microSD + FatFS & native controller \\
+USART1  & Isolated UART (ADuM1402) --- debug \texttt{printf} & -- \\
+TIM1    & Sample-sync CS pulse generator (TRGO $\to$ DMA) & DMA1 Stream~7, Circular \\
+TIM8    & Clock source for TIM1 cascade (TRGO) & DMA1 Stream~4, Circular \\
+USB (FS) CDC & Host data link via ADuM3160 & -- \\
+DMA1 + DMA2 + MDMA & SPI traffic + TIM cascades & enabled \\
+IWDG / WWDG & \textbf{not configured} & -- \\
+RTC (LSE 32.768\,kHz) & \textbf{not used} & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ===========================================================================
+\section{Enclosure, form factor, and cabling}
+\label{sec:enclosure}
+% ===========================================================================
+
+At 128~channels the device cannot reasonably be head-worn. The 130-lead
+harness, plus the 1.5~mm DIN connector field, plus a battery and amp PCB
+exceeds a wearable head-mount mass and volume budget by an order of
+magnitude; every commercial high-density system at 128~channels or above
+solves this the same way (belt-pack or shoulder-pack amp, bundled
+shielded cable to a cap-mounted passive fan-out). The \freeeeg{}-beta
+form factor accepts this:
+
+\begin{center}
+\small
+\begin{tabular}{c}
+Cap (head-worn): 130 dry electrodes $\to$ 130$\times$ 1.5\,mm DIN \\
+$\downarrow$ \\
+Brain-box (cap-mounted, passive fan-out) \\
+$\downarrow$ \\
+1--2 multipole quick-disconnect (HD D-sub HD78 or LEMO EGG.4B) \\
+$\downarrow$ 30--60\,cm shielded bundle \\
+Amp box (belt-pack): \freeeeg{} PCB + battery \\
+$\downarrow$ USB-CDC (or Wi-Fi on beta) \\
+Host PC
+\end{tabular}
+\end{center}
+
+Battery chemistry is flexible because the ADuM3160 + SN6505B + LP5907
+chain already rejects upstream ripple at audio frequencies. The alpha
+stays with a consumer USB power bank; the beta plans a 2S~18650 Li-ion
+pack with an ideal-diode OR between USB-C input and pack, and an LT3045
+class ultra-low-noise LDO for the input rail. A Samsung PRO~Endurance
+microSDXC is recommended for sustained write loads; the stock firmware's
+FatFS is configured for FAT32, so SDXC cards must be reformatted before
+first mount.
+
+The beta-rev connector strategy is \emph{HD D-Sub HD78} at the
+brain-box$\leftrightarrow$amp break, retaining the 1.5~mm DIN at the
+electrode end for subject-contact safety. Two HD78 shells cover 130
+leads; the metal shell provides a known-good shield reference and
+cleanability, and any clinical technician can mate them. An upgrade path
+to LEMO EGG.4B multipole connectors is open for a clinical-grade variant.
+
+% ===========================================================================
+\section{MCU and companion-processor choice}
+\label{sec:mcu}
+% ===========================================================================
+
+We evaluated upgrade paths from the current STM32H743ZI.
+Table~\ref{tab:mcu-options} summarizes. The verdict: retain H743 as the
+acquisition engine; treat STM32N6 as the only interesting STM32 upgrade
+(for on-device ML via the Neural-ART NPU); reject STM32MP2 as wrong-tool-
+for-task; and add an ESP32-S3 co-processor on the beta board to deliver
+Wi-Fi/BLE, CircuitPython compatibility, STEMMA QT / Adafruit sensor
+ecosystem access, and native LSL/WebSocket publishing.
+
+\begin{table}[h]
+\centering\small
+\caption{STM32 upgrade evaluation. Pricing and SKU availability should
+be re-verified with current distributor data.}
+\label{tab:mcu-options}
+\begin{tabular}{llp{4cm}l}
+\toprule
+Option & Clock & Key delta vs H743 & Verdict \\
+\midrule
+STM32H753ZI      & 480\,MHz & + crypto accelerator & No; crypto on ESP32-S3 \\
+STM32H723/H725ZG & 550\,MHz & +15\%, less RAM & No; RAM regression \\
+STM32H7A3/B3ZI   & 280\,MHz & 2\,MB flash + 1.4\,MB RAM, USB-HS PHY & Marginal \\
+STM32H755/H757ZI & 480+240\,MHz & M7 + M4 dual-core & No; doesn't give Adafruit alignment \\
+STM32H7R / H7S   & 600\,MHz & XiP-flash architecture & No \\
+\textbf{STM32N6} & 800\,MHz & \textbf{Cortex-M55 + Helium + on-die NPU} & \textbf{Consider} if on-device ML wanted \\
+STM32MP2         & A35 Linux + M33 & Runs Linux on-chip & \textbf{No}; 10$\times$ battery-weight regression, HDI PCB required, EMI concerns \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Why ESP32 cannot replace the STM32.}
+A full swap to an ESP32-S3 or ESP32-P4 fails on three technical axes: SPI
+bus count (S3 has 2 usable vs our requirement of 6; P4 has 3); absence of
+the TIM-cascade-to-DMA-to-GPIO sample-sync primitive; and WiFi radio
+emissions coupling into a 24-bit $\Delta\Sigma$ analog front-end. These
+objections do not apply to an 8-channel teaching board such as Neurogate
+OctaFlow, which is why ESP32-C3 is correct there. For 128-channel medical-
+grade acquisition the STM32 is the right silicon.
+
+\subsection{Companion processor for the beta revision --- Raspberry Pi Zero 2W}
+\label{sec:pi}
+
+The alpha board communicates with a host computer via USB-CDC. The beta
+revision needs to add wireless host connectivity, on-device scripting,
+LSL / BrainFlow / MNE-Python availability, and an operator-facing web
+UI, so that the whole system can be carried in a shoulder-strap pack and
+used without a tethered laptop. We considered two architectures for this
+companion:
+
+\begin{enumerate}[leftmargin=*]
+\item An on-PCB \textbf{ESP32-S3} co-processor connected to the STM32H743
+over isolated SPI, running ESP-IDF or CircuitPython, re-emitting the
+framed EEG stream over Wi-Fi/BLE/WebSocket/LSL.
+\item A \textbf{Raspberry Pi Zero 2W} (quad-core Cortex-A53, 512~MB RAM,
+dual-band Wi-Fi, BLE~5) sharing the enclosure with the FreeEEG128 PCB,
+connecting over plain USB-CDC, running Raspberry Pi OS~64-bit~Lite with
+the full Python stack pre-installed.
+\end{enumerate}
+
+Table~\ref{tab:companion} compares the two paths. We adopt \textbf{option~2}.
+
+\begin{table}[h]
+\centering\small
+\caption{Companion-processor trade study.}
+\label{tab:companion}
+\begin{tabular}{p{0.3\textwidth}p{0.3\textwidth}p{0.3\textwidth}}
+\toprule
+\textbf{Factor} & \textbf{ESP32-S3 on-PCB} & \textbf{Raspberry Pi Zero 2W} \\
+\midrule
+Additional firmware project & ESP-IDF or CircuitPython, $\sim$2--4 weeks & \textbf{None} — stock Raspberry Pi OS \\
+Native Python / pylsl / BrainFlow / MNE-Python & Requires porting or staged progression & \textbf{Day one} via \texttt{pip install} \\
+Algorithm iteration on-device & No (recompile + flash) & \textbf{Yes} (SSH + Python REPL) \\
+Operator web UI & Would need to write & \textbf{FastAPI + browser in a day} \\
+STM32 $\leftrightarrow$ host link & New isolated SPI bridge + isolator design & \textbf{USB-CDC on existing ADuM3160} \\
+MNE-CPP integration & Requires Stage~2 native plugin & Stage~1 LSL loopback suffices \\
+Average power & $\sim$0.75\,W & $\sim$1.25\,W \\
+Boot time & Instant & 15--30\,s (mitigated by auto-start) \\
+PCB footprint & 25$\times$18\,mm module & 65$\times$30\,mm SBC \\
+Storage & On-chip flash & microSD + optional USB drive \\
+Adafruit-ecosystem pedagogy & CircuitPython native & Via Blinka shim on Linux \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The decisive points are the elimination of the second firmware project
+(deleting two to four weeks of work from the beta critical path) and the
+removal of the staged MNE-CPP integration complexity. The 50\% power-draw
+increase is tolerable --- a 2S 18650 pack (25~Wh) still gives 6--8~h of
+session at total system draw $\sim$3--4~W, which is more than enough for
+typical research paradigms. The boot-time concern is mitigated by
+configuring systemd to auto-start the capture and LSL services on boot,
+and by adding a small e-ink status strip to the enclosure so the operator
+sees when the device is ready.
+
+\subsection{Pre-validation with synthetic data on the Pi Zero 2W}
+\label{sec:prevalidate}
+
+A significant advantage of the SBC architecture is that the entire host
+stack can be validated with simulated EEG data before the FreeEEG128
+firmware rewrite completes. We plan the following benchmark suite to
+run on the Pi Zero 2W in advance of alpha bring-up:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Base Python speed}: NumPy FFT on a 128$\times$25\,000
+complex array; target under 50\,ms.
+\item \textbf{LSL local loopback}: an outlet and inlet pair in the same
+process pushing 128-channel float32 samples at 250\,Hz; measure pull
+latency and sustained throughput for 60\,s.
+\item \textbf{BrainFlow \texttt{SYNTHETIC\_BOARD}}: stream synthetic EEG
+for 5\,min via BrainFlow; confirm zero sample drops.
+\item \textbf{EEG-ExPy packaged experiments}: run NeuroTechX EEG-ExPy's
+Visual~P300, SSVEP, and N170 paradigms with the synthetic backend;
+confirm experimental loop completes without dropped frames.
+\item \textbf{MNE-Python online preprocessing}: filter and ICA on a
+5-minute synthetic epoch; time and memory profile.
+\item \textbf{BIDS-EEG writer}: write a synthetic dataset out to BIDS
+and verify with the BIDS validator.
+\item \textbf{Wall-power draw}: 10-minute LSL loopback measured at a
+USB power meter; confirms the battery-life budget above.
+\end{enumerate}
+
+When the FreeEEG128 firmware is ready, the only change to the host stack
+is swapping the BrainFlow synthetic-board backend for the real-device
+backend. Everything downstream (LSL outlet, MNE processing, EEG-ExPy
+paradigm hooks, BIDS writer, web UI) is validated and stable.
+
+\subsection{Optional: OpenWrt router as a recording appliance}
+\label{sec:openwrt}
+
+For portable-lab deployments and multi-client recording scenarios, an
+OpenWrt-based Wi-Fi router (e.g., GL.iNet GL-MT3000 ``Beryl AX'',
+$\sim$USD~80, pocketable, USB~3 port, Wi-Fi~6) can be added as a
+dedicated network appliance between the Pi-borne FreeEEG128 and one or
+more recording / analysis laptops. OpenWrt provides:
+
+\begin{itemize}[leftmargin=*]
+\item A dedicated SSID (``EEG-NET'') with zero extraneous traffic,
+eliminating LSL~UDP packet loss under lab network contention.
+\item Router-enforced QoS prioritizing LSL traffic.
+\item A system-wide NTP (or, with compatible hardware, PTP) authority,
+providing a common time base across all clients with faster convergence
+than pure LSL time correction.
+\item Packet-level recording redundancy: a lightweight sniffer service
+on the router can dump LSL traffic to a USB stick, so the stream is
+preserved even if a recording laptop crashes.
+\item WireGuard / OpenVPN ingress for remote monitoring, keeping the
+subject's recording network off the venue infrastructure.
+\end{itemize}
+
+For single-subject bench recordings with one laptop, the router adds
+complexity with little benefit and can be skipped (the Pi can run as a
+Wi-Fi access point directly). The architecture earns its keep in field
+deployments, hyperscanning paradigms, and any recording session that
+must be independent of venue Wi-Fi. OpenWrt is deliberately
+\emph{optional} in the roadmap; the Pi-and-laptop baseline is the
+default.
+
+% ===========================================================================
+\section{Firmware rewrite}
+% ===========================================================================
+
+The stock alpha firmware was written against STM32CubeMX 1.5.1 in approximately
+2021--2022. It demonstrates working communication with all sixteen ADS131M08
+chips at 250~Hz and emits raw 24-bit samples over USB-CDC to a host. It is,
+however, fundamentally research-prototype quality. Table~\ref{tab:fw-plan}
+summarizes the planned rewrite.
+
+\begin{table}[h]
+\centering\small
+\caption{Firmware rewrite plan. Phase ordering assumes a baseline capture
+from the stock firmware precedes any code change.}
+\label{tab:fw-plan}
+\begin{tabular}{llp{7cm}}
+\toprule
+Phase & Id & Scope \\
+\midrule
+Baseline & P0.1 & Power-on + CDC enumeration \\
+         & P0.2 & 60\,s shorted-input noise floor + 5\,min eyes-closed baseline \\
+         & P0.3 & STM32 pin audit $\to$ \texttt{docs/alpha-pinmap.md} \\
+Protocol & P1.0 & Wire-packet format: magic, length, seq, device \textmu s timestamp, ADC status, 128$\times$int24, IMU, CRC32 \\
+         & P1.1 & Host command protocol: \texttt{START}, \texttt{STOP}, \texttt{SET\_RATE}, \texttt{SET\_GAIN}, \texttt{LEAD\_OFF\_START}, \texttt{LEAD\_OFF\_STOP}, \texttt{GET\_CAPS}, \texttt{REBOOT\_DFU} \\
+Rewrite  & P1.2 & Regenerate \texttt{.ioc} on current CubeMX; lock USB to FS \\
+         & P1.3 & Firmware scaffold: \texttt{hal/}, \texttt{drivers/}, \texttt{transport/}, \texttt{services/} \\
+         & P1.4 & ADS131M08 driver --- per-sample CRC forwarding, drop counter, TIM/DMA CS cascade (highest risk) \\
+         & P1.5 & LSM6DS3 IMU driver + interleaved IMU packets \\
+         & P1.6 & USB-CDC framed transport, MPU non-cacheable DMA region, re-enabled D-Cache \\
+         & P1.7 & Acquisition service, IWDG, RTC timestamping, boot banner, dead-code purge \\
+         & P1.8 & \textbf{Impedance mode as first-class feature} --- ADS131M08 lead-off current injection + per-channel magnitude/phase \\
+         & P1.9 & SD logging service + DFU-jump command \\
+Host     & P2   & Python pyserial capture $\to$ LSL outlet + BIDS-EEG writer + FIFF writer + quality dashboard \\
+         & P2b  & BrainFlow board definition (upstream) \\
+         & P2c  & MNE-CPP native acquisition plugin (upstream PR to \texttt{mne-tools/mne-cpp}) \\
+Validation & P3 & Eyes-closed 8--14\,Hz alpha replication of Black et~al.\ 2017 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ===========================================================================
+\section{Host and application support}
+\label{sec:apps}
+% ===========================================================================
+
+We target the full open real-time EEG stack on day one of the beta release:
+
+Host-side software runs on the beta's Pi Zero 2W companion
+(Section~\ref{sec:pi}), with Raspberry Pi OS~64-bit~Lite as the base
+operating system.
+
+\begin{description}[leftmargin=*]
+\item[Lab Streaming Layer (LSL).] Python host publishes an LSL outlet
+per device; Labstreamer TTL markers ingest as a second LSL stream.
+\item[BrainFlow.] We write and upstream a \texttt{Board} definition,
+which pulls in MNE-LSL, LabRecorder, Timeflux, NeuroPype, and OpenViBE
+for free.
+\item[Open Ephys GUI.] An acquisition plugin, modeled on the Rhythm
+Node, ingests \freeeeg{} frames into the Open Ephys GUI plugin
+architecture.
+\item[MNE-CPP / MNE Scan.] Three-stage integration. Stage 1 is free via
+LSL loopback through MNE Scan's existing LSL adapter. Stage 2 is a
+native \texttt{freeeeg128adapter} plugin modeled on
+\texttt{applications/mne\_scan/plugins/lsladapter/} and upstreamed via
+PR. Stage 3 adds FIFF writing in the Python host so that MNE-Python
+users read captures via \texttt{mne.io.read\_raw\_fif()} with no
+translation layer.
+\item[BIDS-EEG.] Python host writes BIDS-compliant datasets with event
+markers and per-channel impedance metadata.
+\item[EEG-ExPy.] NeuroTechX's EEG-ExPy paradigm library
+(\href{https://neurotechx.github.io/eeg-expy/}{neurotechx.github.io/eeg-expy})
+provides packaged implementations of Visual~P300, SSVEP, N170, and
+auditory-oddball experiments. These are used for the pre-validation
+benchmarks in Section~\ref{sec:prevalidate} and remain available as
+ready-to-run paradigms for users of the finished device.
+\item[Operator web UI.] A FastAPI application on the Pi serves a
+browser-based session control and quality-monitoring dashboard, so that
+the subject's device needs no tethered laptop during a recording
+session.
+\end{description}
+
+\subsection{Comparison-plot}
+
+Figure~\ref{fig:landscape} places \freeeeg{} against the open-hardware
+landscape on the channel-count versus BOM-cost plane.
+
+<<landscape-plot, fig=TRUE, echo=FALSE, results=hide, height=3.5, width=6>>=
+boards <- data.frame(
+  name = c("OpenBCI\nCyton","OpenBCI\nGanglion","HackEEG",
+           "PiEEG-16","IronBCI","Neurogate\nOctaFlow",
+           "BIOADC","FreeEEG32\nbeta","Open Ephys\n+ EEG",
+           "FreeEEG128\n(this work)"),
+  channels = c(8, 4, 32, 16, 8, 8, 32, 32, 128, 128),
+  price    = c(1000, 500, 450, 600, 300, 200, 400, 500, 3000, 900),
+  res      = c(24, 24, 24, 24, 24, 24, 24, 24, 16, 24),
+  pch      = c(1, 1, 1, 1, 1, 1, 1, 1, 2, 19)
+)
+op <- par(mar=c(4.2, 4.2, 0.5, 0.5), cex=0.85)
+plot(boards$price, boards$channels,
+     log="xy",
+     xlab="Estimated BOM / retail cost (USD, log scale)",
+     ylab="Channel count (log scale)",
+     pch=boards$pch, cex=1.6,
+     xlim=c(150, 5000), ylim=c(3, 200))
+text(boards$price, boards$channels, labels=boards$name, pos=4, offset=0.6, cex=0.7)
+abline(h=128, lty=3, col="gray50")
+legend("bottomleft",
+       legend=c("Other open HW","Open Ephys + EEG (Black 2017)","FreeEEG128"),
+       pch=c(1, 2, 19), bty="n", cex=0.8)
+par(op)
+@
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{paper-landscape-plot}
+\caption{Open-hardware EEG landscape on the channel-count vs.\ cost plane.
+\freeeeg{} and Open Ephys~+~EEG (Black et~al.\ 2017) are the only
+128-channel entries; \freeeeg{} achieves this at approximately one-third
+the cost and with \mbox{24-bit} ADC resolution versus the Intan RHD
+family's 16-bit.}
+\label{fig:landscape}
+\end{figure}
+
+% ===========================================================================
+\section{Validation plan}
+\label{sec:validation}
+% ===========================================================================
+
+The acceptance gate for calling anything ``beta'' is a direct replication
+of Black et~al.~\citep{black2017openephyseeg}: eyes-closed 8--14~Hz alpha
+power and SNR, side-by-side against a BrainVision actiCHamp (or another
+clinical-grade reference amplifier). The same subject, the same room, the
+same electrode montage where possible. We report per-channel average
+power and broadband SNR matching the Black paradigm, plus the drop-counter
+and impedance metadata that the firmware rewrite delivers. Raw data and
+analysis notebooks are published under \texttt{docs/validation/} at the
+same moment the beta schematic is released.
+
+Secondary validation targets, sequenced after the acceptance gate:
+an auditory-oddball P300 latency confirmed within 20~ms against a
+Labstreamer photodiode/TTL ground truth; a steady-state visual evoked
+potential (SSVEP) spectrum at 6, 7.5, 10, and 15~Hz; and a resting-state
+connectivity replication against one of the large publicly available
+datasets.
+
+% ===========================================================================
+\section{Open questions and next steps}
+% ===========================================================================
+
+Open items that require decisions during Phase~B0 of the beta rev:
+
+\begin{enumerate}[leftmargin=*]
+\item Black's \textit{Brain Topography} DOI for Tucker 1993 --- currently
+cited from Tucker's 1993 \textit{Electroencephalography and Clinical
+Neurophysiology} paper; check whether there is a better primary for the
+Geodesic Sensor Net.
+\item Whether to enable the Neural-ART NPU via STM32N6 on the beta, or
+keep STM32H743 and plan on-device ML only as a software add-on.
+\item Whether the \freeeeg{} hardware license moves from the upstream
+NeuroIDSS AGPL-3.0 to CERN-OHL-S-v2 (strongly recommended; AGPL is a
+software license and is legally murky on hardware).
+\item Connector choice for the brain-box$\leftrightarrow$amp link:
+HD D-Sub HD78 (budget path) or LEMO EGG.4B (clinical-grade path).
+\item Whether to reproduce Black et~al.'s commercial-cap adapter chain
+as a sister \freeeeg{}-amp-only product for users with existing EasyCap
+hardware.
+\item Whether to ship a reference OpenWrt configuration
+(Section~\ref{sec:openwrt}) for portable-lab deployments, or leave that
+to users.
+\end{enumerate}
+
+Immediate next steps (this week): power-on and enumeration check of the
+alpha unit in hand; baseline noise-floor and eyes-closed alpha capture
+with the stock firmware; STM32 pin audit to freeze the pinout before any
+firmware changes; lock the wire-packet and command-protocol specs as the
+alpha$\to$beta carry-over artifacts.
+
+% ===========================================================================
+\section*{Acknowledgments}
+% ===========================================================================
+
+The intellectual and engineering lineage of this project is long. Paul
+Nunez and Alan Gevins laid the theoretical and practical foundations of
+high-density and high-resolution EEG. Don Tucker built the Geodesic
+Sensor Net and with it the form factor this system inherits; Ramesh
+Srinivasan carried the Nunez biophysical framework into EGI's product
+line. M.E.\ Pflieger and S.F.\ Sands at Neuroscan built the first
+256-channel system. The entire open-hardware generation --- Joel Murphy
+and Conor Russomanno at OpenBCI, Josh Siegle and Jakob Voigts at Open
+Ephys, Adam Feuer at HackEEG, Gaetano Gargiulo at BIOADC, Ildar
+Rakhmatulin at PiEEG/IronBCI, David Vivancos at NeuroIDSS/FreeEEG --- made
+this project thinkable.
+
+% ===========================================================================
+\bibliography{refs}
+% ===========================================================================
+
+\end{document}
