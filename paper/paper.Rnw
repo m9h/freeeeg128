@@ -47,8 +47,7 @@
   \large Historical lineage, current-state audit, and alpha/beta plan}
 
 \author[1]{Morgan Hough}
-\affil[1]{Independent researcher. Formerly: first software engineering manager,
-  Electrical Geodesics, Inc.\ (EGI), 1990s.\\
+\affil[1]{NeuroTechX.\\
   \texttt{morgan.hough@gmail.com}}
 
 \date{April 2026}
