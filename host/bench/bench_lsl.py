@@ -30,9 +30,19 @@ def main() -> None:
 
     emit("lsl.resolve", 1, "status")
 
-    # Push + pull at 250 Hz, measure latency per batch and aggregate throughput.
+    # Warmup: prime the inlet/outlet pair.  The first pull_chunk after
+    # StreamInlet construction can block on LSL's own handshake/buffer
+    # setup, producing a deceptive "1 s max latency" datapoint that isn't
+    # representative of steady state.  Push 100 samples and drain.
     rng = np.random.default_rng(0)
     batch = 25  # 100 ms
+    for _ in range(4):
+        warm = rng.standard_normal((batch, CH)).astype(np.float32)
+        for row in warm:
+            outlet.push_sample(row)
+        inlet.pull_chunk(timeout=1.0, max_samples=batch)
+
+    # Timed loop
     n_batches = N_SAMPLES // batch
     lat_ms = np.empty(n_batches, dtype=np.float64)
     t0 = time.perf_counter()
@@ -41,7 +51,7 @@ def main() -> None:
         ts_push = time.perf_counter()
         for row in block:
             outlet.push_sample(row)
-        inlet.pull_chunk(timeout=1.0, max_samples=batch)
+        inlet.pull_chunk(timeout=0.5, max_samples=batch)
         lat_ms[i] = (time.perf_counter() - ts_push) * 1000
     wall = time.perf_counter() - t0
 
