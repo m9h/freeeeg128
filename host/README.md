@@ -114,30 +114,53 @@ on the full pipeline.
 ```
 host/
 ├── README.md                       ← this file
-├── Makefile                        ← make bench, make install, make fmt
+├── Makefile                        ← make bench, make install
 ├── pyproject.toml                  ← package metadata, dependencies
-├── bench/
+├── freeeeg128/                     ← host capture client package (main module)
 │   ├── __init__.py
+│   ├── protocol.py                 ← framed-packet parser (docs/packet-format.md v1)
+│   ├── synthetic.py                ← pure-Python synthetic source
+│   ├── lsl_bridge.py               ← bytes → parser → LSL outlet
+│   └── recorder.py                 ← LSL inlet → FIFF + BIDS-EEG writer
+├── tests/
+│   └── test_protocol.py            ← 9 round-trip + resync + CRC tests
+├── bench/
 │   ├── bench_python.py
 │   ├── bench_lsl.py
-│   ├── bench_brainflow.py
+│   ├── bench_brainflow.py          ← skips on aarch64 (upstream wheel bug)
 │   ├── bench_mne.py
 │   └── bench_eegexpy.py
 ├── scripts/
 │   ├── install_pi.sh               ← apt + pip bootstrap
-│   └── run_all_bench.sh            ← runs every bench and appends to results/
-└── results/                        ← .csv files per run, committed so we can diff across revisions
+│   ├── run_all_bench.sh            ← runs every bench, appends to results/
+│   ├── synth_to_lsl.py             ← synthetic source → LSL outlet
+│   ├── record_session.py           ← LSL inlet → FIFF + BIDS-EEG
+│   └── pipeline_smoketest.sh       ← end-to-end hardware-free validation
+└── results/                        ← benchmark CSVs, committed for diff across revs
 ```
 
-Future additions:
+## End-to-end pipeline without hardware
 
+The full host stack — framed-packet parser, LSL republisher, FIFF
+writer, BIDS-EEG writer — runs today on the Pi Zero 2W with synthetic
+data.  The only change when real hardware arrives is swapping the
+byte source from `SyntheticSource` to `pyserial.Serial` reading the
+FreeEEG128's USB-CDC tty.
+
+```bash
+# one-shot smoke test
+host/scripts/pipeline_smoketest.sh
+
+# or run the stages manually:
+./scripts/synth_to_lsl.py --duration 30 --realtime &
+./scripts/record_session.py --duration 20 --subject demo
 ```
-├── freeeeg128/                     ← the actual capture client package
-│   ├── transport/                  ← USB-CDC reader, LSL outlet
-│   ├── protocol/                   ← framed-packet parser (mirrors firmware docs/packet-format.md)
-│   ├── services/                   ← impedance, quality monitor, BIDS writer, FIFF writer
-│   └── ui/                         ← FastAPI web UI
-```
+
+Outputs land in `host/out/recordings/`:
+- `sub-<id>_ses-<n>_task-<name>_<ts>_raw.fif` — MNE-ready FIFF.
+- `bids/` — BIDS-EEG directory tree (participants.tsv, dataset_description.json, sub-*/ses-*/eeg/*.edf, channels.tsv, scans.tsv, README).
+
+Pi-validated performance (4996 / 5000 samples, ~0.08 % drop from poll granularity, on a 20 s record at 250 Hz × 128 ch).
 
 ## Running without a Pi
 
