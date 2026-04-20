@@ -11,7 +11,7 @@ sudo apt update
 sudo apt install -y \
   git build-essential \
   python3 python3-venv python3-dev python3-pip \
-  libatlas-base-dev libopenblas-dev \
+  libopenblas-dev \
   libusb-1.0-0 \
   curl
 
