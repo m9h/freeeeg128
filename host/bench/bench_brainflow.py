@@ -14,6 +14,19 @@ from . import emit
 
 
 def main() -> None:
+    # BrainFlow 5.21 wheel for aarch64 on PyPI ships x86-64 .so files (upstream
+    # packaging bug).  Skip gracefully on ARM until upstream fixes the wheel,
+    # or we build from source.  See host/README.md.
+    import platform
+    if platform.machine() in ("aarch64", "arm64", "armv7l", "armv6l"):
+        try:
+            import ctypes, os
+            lib_dir = os.path.join(os.path.dirname(__import__("brainflow").__file__), "lib")
+            ctypes.CDLL(os.path.join(lib_dir, "libBoardController.so"))
+        except OSError:
+            emit("brainflow.status", 0, "skipped_aarch64_wheel_bug")
+            return
+
     params = BrainFlowInputParams()
     board_id = BoardIds.SYNTHETIC_BOARD.value
     board = BoardShim(board_id, params)
