@@ -94,7 +94,7 @@ Cortex-A53 quad @ 1 GHz, 512 MB RAM) over iPhone Personal Hotspot.
 | Log 1M float64 | < 200 ms | **50.5 ms** | < 10 ms | ALU-bound |
 | LSL p50 latency (100 ms batch, 128 ch) | < 20 ms | **12.8 ms** | < 2 ms | push+pull over localhost |
 | LSL p95 latency | < 20 ms | **12.9 ms** | | |
-| LSL max latency | < 100 ms | **1010 ms** ⚠ | | one ~1 s stall per 60 s run — likely WiFi retry or Python GC |
+| LSL max latency | < 50 ms | **14.8 ms** | | earlier 1010 ms was a bench-warmup artefact; fixed in commit f46cd38 |
 | LSL sustained throughput | > 500 sps | **1680 sps** | | 6.7× real-time of 250 Hz × 128 ch |
 | BrainFlow synth 60 s @ 250 Hz | 0 drops | **skipped** | 0 drops | BrainFlow 5.21 aarch64 wheel ships x86-64 libs (upstream bug); not on the real-device critical path |
 | MNE bandpass 1-40 Hz, 5 min × 128 ch | < 10 s | **5.46 s** | < 1 s | FIR firwin |
@@ -103,10 +103,11 @@ Cortex-A53 quad @ 1 GHz, 512 MB RAM) over iPhone Personal Hotspot.
 | Wall power, 10-min active capture | < 3 W | not-yet-measured | | needs USB power meter |
 
 The Pi Zero 2W comfortably handles our target workload of 128 ch × 250 Hz
-streaming + host-side buffering, with roughly **6× real-time margin** on
-the LSL path. The occasional 1-second LSL stall is the only number worth
-chasing — investigate whether it's WiFi-power-save (try `iw wlan0 set power_save off`),
-Python GC, or LSL multicast resolve.
+streaming + host-side buffering, with roughly **7.6× real-time margin** on
+the LSL path (1907 sps achieved vs 250 sps target). End-to-end
+`synth_to_lsl.py` (synthetic → parser → LSL outlet) runs 30 s of 128 ch
+× 250 Hz in 13 s wall time with **0 drops** — about 2.3× real-time margin
+on the full pipeline.
 
 ## Directory layout
 
