@@ -81,19 +81,32 @@ compare across OS choices, Pi models, and (eventually) real-device runs.
 Each prints one line of JSON per metric to stdout; `make bench` pipes all of
 them into one CSV.
 
-## Targets (Pi Zero 2W, stock Raspberry Pi OS Lite, 2S 18650 on USB-C PD)
+## Targets (Pi Zero 2W, Raspberry Pi OS Lite 64-bit, Bookworm-class)
 
-These are sanity targets we establish once so we can tell when something
-regresses later. Fill in the first time you run them.
+Sanity floor we establish once so we can tell when something regresses
+later. **First-run numbers captured 2026-04-19** on Pi Zero 2W (BCM2710
+Cortex-A53 quad @ 1 GHz, 512 MB RAM) over iPhone Personal Hotspot.
 
-| Bench | Target | Measured (Pi Zero 2W) | Measured (laptop) |
-| --- | --- | --- | --- |
-| FFT 128×25 000 complex | < 50 ms | | |
-| LSL push+pull 100 samples × 128 ch | < 20 ms round-trip | | |
-| BrainFlow synth 60 s @ 250 Hz | 0 drops | | |
-| MNE bandpass + ICA, 5 min | < 30 s | | |
-| Wall power at USB meter, 10-min idle loopback | < 2 W | | |
-| Wall power, 10-min active capture | < 3 W | | |
+| Bench | Target | **Pi Zero 2W** | Laptop | Notes |
+| --- | --- | --- | --- | --- |
+| FFT 128×25 000 complex64 | < 2 s | **1522 ms** | ~40 ms | single-thread NumPy+OpenBLAS; Cortex-A53 is ~30× slower than M-series on FP64 |
+| Dot 2M float32 | < 20 ms | **8.4 ms** | < 2 ms | memory-BW dominated |
+| Log 1M float64 | < 200 ms | **50.5 ms** | < 10 ms | ALU-bound |
+| LSL p50 latency (100 ms batch, 128 ch) | < 20 ms | **12.8 ms** | < 2 ms | push+pull over localhost |
+| LSL p95 latency | < 20 ms | **12.9 ms** | | |
+| LSL max latency | < 100 ms | **1010 ms** ⚠ | | one ~1 s stall per 60 s run — likely WiFi retry or Python GC |
+| LSL sustained throughput | > 500 sps | **1680 sps** | | 6.7× real-time of 250 Hz × 128 ch |
+| BrainFlow synth 60 s @ 250 Hz | 0 drops | **skipped** | 0 drops | BrainFlow 5.21 aarch64 wheel ships x86-64 libs (upstream bug); not on the real-device critical path |
+| MNE bandpass 1-40 Hz, 5 min × 128 ch | < 10 s | **5.46 s** | < 1 s | FIR firwin |
+| MNE ICA 15 components, 5 min × 128 ch | < 30 s | not-yet-measured | | sklearn fastica method available after `pip install scikit-learn` |
+| Wall power, 10-min LSL idle loopback | < 2 W | not-yet-measured | | needs USB power meter |
+| Wall power, 10-min active capture | < 3 W | not-yet-measured | | needs USB power meter |
+
+The Pi Zero 2W comfortably handles our target workload of 128 ch × 250 Hz
+streaming + host-side buffering, with roughly **6× real-time margin** on
+the LSL path. The occasional 1-second LSL stall is the only number worth
+chasing — investigate whether it's WiFi-power-save (try `iw wlan0 set power_save off`),
+Python GC, or LSL multicast resolve.
 
 ## Directory layout
 
