@@ -127,6 +127,14 @@ BCI hardware landscape.
 
 [5] Knierim, M.T., Schemmer, M. & Bauer, N. A simplified design of a cEEGrid ear-electrode adapter for the OpenBCI biosensing platform. *HardwareX* **12**, e00357 (2022). doi:10.1016/j.ohx.2022.e00357.
 
+[5a] Knierim, M.T., Berger, C. & Reali, P. Open-source concealed EEG data collection for Brain-computer-interfaces — neural observation through OpenBCI amplifiers with around-the-ear cEEGrid electrodes. *Brain-Computer Interfaces* **8**(4), 161-179 (2021). doi:10.1080/2326263X.2021.1972633. **Template for a FreeEEG-Ear spin-off product line.** Demonstrates that an open-hardware ADS1299-based amplifier can serve the concealed / around-the-ear form factor at clinical-grade signal quality, opening a separate application track orthogonal to high-density research rigs: ~1-minute electrode application, no hair prep, <5-minute protocols. Pairs naturally with passive paradigms like Fastball (Stothart et al.) for implicit-recognition screening that works on cognitively impaired populations where instruction-following fails — dementia, stroke, pediatric. The same ADS131M08 + STM32H743 architecture that drives FreeEEG128 at 128 ch scales cleanly *down* to a 16-20 ch cEEGrid-class board with unchanged firmware / host / packet-format / LSL stack.
+
+[5b] Debener, S., Emkes, R., De Vos, M. & Bleichner, M.G. Unobtrusive ambulatory EEG using a smartphone and flexible printed electrodes around the ear. *Scientific Reports* **5**, 16743 (2015). doi:10.1038/srep16743. *The original cEEGrid paper.*
+
+[5c] Stothart, G., Quadflieg, S. & Milton, A. A fast and implicit measure of semantic categorisation using steady state visual evoked potentials. *Neuropsychologia* **102**, 11-18 (2017). doi:10.1016/j.neuropsychologia.2017.05.025. *Origin of the **Fastball paradigm**: rapid serial visual presentation at 3 Hz with embedded oddball at 0.6 Hz, passive implicit-recognition response detected in <3 min, no overt task required.*
+
+[5d] Stothart, G., Smith, L.J., Milton, A. & Coulthard, E. A passive and objective measure of recognition memory in Alzheimer's disease using Fastball memory assessment. *Brain* **144**(9), 2812-2825 (2021). doi:10.1093/brain/awab154. *Fastball applied to Alzheimer's screening — the clinical end of the cEEGrid + Fastball application pathway.*
+
 [6] Uktveris, T. & Jusas, V. Development of a Modular Board for EEG Signal Acquisition. *Sensors* **18**, 2140 (2018). doi:10.3390/s18072140.
 
 [7] Gargiulo, G.D. et al. Fully Open-Access Passive Dry Electrodes BIOADC: Open-Electroencephalography (EEG) Re-Invented. *Sensors* **19**, 772 (2019). doi:10.3390/s19040772.

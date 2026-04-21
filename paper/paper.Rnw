@@ -885,6 +885,48 @@ firmware changes; lock the wire-packet and command-protocol specs as the
 alpha$\to$beta carry-over artifacts.
 
 % ===========================================================================
+\section{Future directions: form-factor variants}
+\label{sec:variants}
+% ===========================================================================
+
+The STM32H743 + 16$\times$ADS131M08 + framed-packet stack developed
+here is not specific to a 128-channel cap. The same firmware, same
+host Python package, same wire protocol, and same LSL outlet all work
+at other channel counts because the \texttt{CAPABILITIES} packet
+(\S\ref{sec:related}) carries \texttt{n\_eeg\_channels} and the full
+label list on every boot. Two spin-off directions are captured in the
+project roadmap:
+
+\paragraph{\textbf{FreeEEG-Ear} --- concealed around-the-ear form factor.}
+Knierim et~al.~\citep{knierim2021concealed,knierim2022ceegrid} demonstrate
+that an open-hardware ADS1299-class amplifier connected to
+cEEGrid~\citep{debener2015ceegrid} around-the-ear flex-PCB electrodes
+captures clinical-grade EEG at \textasciitilde 10--20 channels per ear
+with electrode application times under one minute and no hair
+preparation. Paired with the Fastball
+paradigm~\citep{stothart2017fastball,stothart2021fastball} --- a
+3~Hz rapid serial visual presentation with an embedded 0.6~Hz oddball
+producing a passive implicit-recognition response in under three minutes
+--- this form factor opens a screening-grade clinical pathway
+(dementia, stroke, paediatric memory assessment) that is not
+addressable by a 128-channel research rig. Hardware changes from
+FreeEEG128 are confined to the cap-side connector and a reduced
+ADS131M08 count; the firmware source tree and host stack port
+unchanged.
+
+\paragraph{\textbf{FreeEEG256} --- density upgrade into the VHD class.}
+32$\times$ADS131M08 across the same six SPI buses, same MCU, same
+isolation topology. Moves into the very-high-density class alongside
+g.Pangolin (\S\ref{sec:vhd}) while remaining open hardware. Not on the
+near-term roadmap but the firmware and host work done for FreeEEG128
+port forward unchanged.
+
+The key enabling property for both is that the protocol is
+cap-agnostic: the \texttt{CAPABILITIES} descriptor turns any variant
+into a self-describing device the host stack recognizes without
+recompilation.
+
+% ===========================================================================
 \section*{Acknowledgments}
 % ===========================================================================
 

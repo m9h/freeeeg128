@@ -171,6 +171,76 @@ This leaves **STM32N6** as the only STM32 upgrade worth further evaluation (on-d
 
 ---
 
+## Future form-factor variants (post-beta, same architecture)
+
+The STM32H743 + ADS131M08 + framed-packet stack isn't specific to a
+128-channel cap. The same firmware, same host Python package, same wire
+protocol, same LSL outlet all work at other channel counts. Two concrete
+directions worth capturing:
+
+### FreeEEG-Ear — concealed cEEGrid form factor
+
+Knierim, Berger & Reali (2021, *Brain-Computer Interfaces*,
+[doi:10.1080/2326263X.2021.1972633](https://doi.org/10.1080/2326263X.2021.1972633))
+demonstrate that an OpenBCI-class ADS1299 amplifier, connected to
+cEEGrid around-the-ear flex-PCB electrodes (Debener et al. 2015,
+*Scientific Reports*), captures clinical-grade EEG at ~10-20 channels
+per ear with:
+
+- **~1-minute electrode application** (adhesive-backed cEEGrid, no
+  hair prep, no saline/gel)
+- **Concealed / wearable-all-day** — sits behind the pinna, not visible
+  under normal hair
+
+Pairs naturally with the **Fastball paradigm** (Stothart et al. 2017
+*Neuropsychologia*; Stothart et al. 2021 *Brain*) — rapid serial visual
+presentation at 3 Hz with embedded 0.6 Hz oddball, ~3-minute passive
+protocol producing an implicit-recognition response. Fastball
+works on populations where instruction-following fails (dementia,
+stroke, paediatric), making it the natural clinical-screening
+application for a cEEGrid-class device.
+
+**Architecturally**: one or two ADS131M08s (8 ch each), same
+STM32H743-class MCU, same full-speed USB-CDC / Pi-Zero-2W companion
+pattern, same firmware source tree with `n_eeg_channels` baked into
+the capability descriptor. The hardware delta is almost entirely
+**cap connector + mechanical form factor** (flex-PCB strip + adhesive
+backing vs 130-pin DIN harness). The firmware doesn't care.
+
+Staging relative to current work:
+
+- **FreeEEG128 beta** finishes first — that's where the acquisition-
+  architecture correctness + firmware rewrite + host stack get proven.
+- **FreeEEG-Ear** then becomes a board-layout-only project — schematic
+  changes limited to removing 14 ADS131M08 instances and the 130-lead
+  fan-out, and swapping the cap interface for a cEEGrid-compatible
+  connector. Most of the expensive design work (isolation, LDOs,
+  references, USB, firmware, host) is direct reuse.
+- **Fastball pipeline** can be developed in parallel using EEG-ExPy or
+  PsychoPy on the existing Pi-Zero-2W host, validated against the
+  FreeEEG128 board, then deployed against FreeEEG-Ear when that board
+  lands. The cap-side change is invisible to the stimulus engine.
+
+Clinical indication pathway: dementia memory screening → stroke
+recovery assessment → paediatric language/memory assessment → teletherapy
+monitoring. Each of those is a several-hundred-thousand-patient-a-year
+market in the US alone; none is addressable by a 128-channel research rig.
+
+### FreeEEG256 — density upgrade
+
+Same STM32H743 + firmware, 32× ADS131M08 across the six SPI buses
+instead of 16. Moves into the VHD-EEG class (256 ch is where g.Pangolin
+lives — see `COMPARISON.md`). Bigger board, more expensive BOM, harder
+cap manufacturing. Not on the near-term roadmap but the firmware and
+host work done for FreeEEG128 port forward unchanged.
+
+### Both variants exist because the protocol is cap-agnostic
+
+The `CAPABILITIES` packet (protocol v1 §0x20) carries `n_eeg_channels`
+and a label list on every boot. Host software auto-configures for the
+connected device. This is why these two spin-offs cost one board layout
+each, not full firmware + host rewrites.
+
 ## Work we should NOT do on the alpha
 
 Things that would waste effort because they don't transfer:
