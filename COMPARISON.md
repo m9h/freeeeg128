@@ -169,6 +169,64 @@ channel wearable" niche that has no current peer. A natural upgrade path
 exists for a hypothetical `FreeEEG256` on the same STM32H743 + ADS131M08
 chassis, but that is explicitly not within the current roadmap.
 
+---
+
+## Lessons from Cardona-Álvarez et al. 2023 (OpenBCI framework)
+
+Reference: Cardona-Álvarez et al., *Sensors* **23**, 3763 (2023), doi:10.3390/s23073763. The most detailed published architecture reference for a production open-hardware BCI framework — worth reading before writing our own P2-P2c components.
+
+### What they built
+
+- OpenBCI Cyton (ADS1299, 8 ch; 16 ch with Daisy) with **custom low-level drivers** replacing the deprecated official Python layer.
+- **Raspberry Pi as acquisition server** (validates our Pi Zero 2W companion choice).
+- **Three-layer driver architecture**: low-level board I/O → high-level stream abstraction → application UI (PySide6 GUI).
+- **Distributed computing via Apache Kafka** for multi-consumer message streaming.
+- Stimulus delivery via **Brython-Radiant** (browser-based HTML/CSS/JS).
+- Marker synchronization validated against a **Light-Dependent Resistor (LDR)** → the same technique we plan with Labstreamer + in-band photodiode.
+- Open-source repos: <https://github.com/UN-GCPDS/openbci-stream>, <https://github.com/UN-GCPDS/BCI-framework>, docs at <https://docs.bciframework.org/>.
+
+### Benchmarking methodology we can copy
+
+Their Table 6 compares three systems on two metrics:
+
+| System | Latency | Jitter | Communication |
+| --- | --- | --- | --- |
+| OpenBCI (theirs) | 56 % relative (100-sample block @ 1 kHz) | **5.7 ms** | Wireless |
+| BCI2000 + g.USBamp | 14-48 % relative | 5.91 ms | Wired |
+| OpenViBE + TMSi | 100.4 % relative | 3.07 ms | Optical |
+
+Adopt this exact table for FreeEEG128's validation section: column 1 = system, column 2 = relative latency, column 3 = jitter, column 4 = transport. Directly comparable to our LSL bench p50 / p95 / max measurements (currently 12.8 / 12.9 / 14.8 ms on Pi Zero 2W, all tighter than their wireless OpenBCI numbers).
+
+### Three sample-integrity detection methods
+
+They cross-check stream completeness with:
+
+1. Device-side **timestamp** on each sample
+2. **Test-signal mode** (ADS chip-internal known waveform) to detect insertion/deletion
+3. **Sample-index counter** (our `seq` field)
+
+Our protocol has (1) via `ts_us` and (3) via `seq`, but **not (2) test-signal mode**. Add a `SELF_TEST` / `SET_MUX` pair to our command protocol that lets host validate stream integrity against the ADS131M08's test patterns. Already on the list as `CmdId.SELF_TEST` / `CmdId.SET_MUX` — this paper validates the need.
+
+### Explicit criticisms of stock OpenBCI we can frame against
+
+They enumerate OpenBCI pain points that our design must not inherit:
+
+- *"Need for more effective communication between computers and peripheral devices"* — addressed in our **host command protocol** (v1 locked in `docs/command-protocol.md`).
+- *"[Stock GUI] does not allow for data acquisition under specific parameters"* — addressed by our `SET_RATE` / `SET_GAIN` / `SET_MUX` commands.
+- **Deprecated Python drivers** (historical) — replaced by BrainFlow. We target BrainFlow native from day one.
+- **Cyton + Daisy interleave artifact**: expanding 8→16 channels alternates samples between two boards, requiring host-side interpolation that introduces phase error. **FreeEEG128's 16× ADS131M08 on a TIM1/TIM8-synchronized DMA cascade eliminates this artifact entirely** — all 128 channels are genuinely simultaneously sampled. This is one of the strongest technical arguments for our architecture over OpenBCI's.
+
+### Paradigm gap we can fill
+
+Their validation covered **motor imagery only** (cue-based left/right arrow paradigm). No P300, SSVEP, N170, MMN, or alpha rhythm. Combined with Black et al. 2017's eyes-closed alpha reference, FreeEEG128's planned validation battery — Black-style alpha *plus* P300 latency *plus* SSVEP spectrum *plus* optional N170 — materially expands the open-hardware EEG validation literature.
+
+### What we will *not* copy from them
+
+- **Apache Kafka** — overkill for single-subject recording with ≤10 consumers. Our LSL + BrainFlow stack covers the message-fan-out use case with far lower operational overhead. Revisit Kafka only if we grow into multi-device hyperscanning.
+- **Brython-Radiant** stimulus delivery — we use PsychoPy / Labstreamer, which are the clinical-research standard.
+
+---
+
 ### Supporting VHD-EEG literature
 
 - **Schreiner et al. 2024** — introduces g.Pangolin; demonstrates 256-ch

@@ -112,7 +112,14 @@ et~al.\ 2017~\citep{siegle2017openephys}) generalized 512-channel
 multichannel electrophysiology via a plugin GUI; Black et~al.\
 2017~\citep{black2017openephyseeg} adapted that platform to 128-channel
 human EEG and validated it side-by-side against a BrainVision actiCHamp
-clinical amplifier. More recent entries --- PiEEG, IronBCI, HackEEG, BIOADC,
+clinical amplifier. Cardona-\'{A}lvarez et~al.\
+2023~\citep{cardona2023openbci} published the most detailed production
+framework for an open-hardware BCI to date, built on OpenBCI Cyton with
+a Raspberry Pi acquisition server, distributed Kafka-based message
+fan-out, and a custom three-layer driver stack; their work documents
+the OpenBCI Cyton+Daisy 8$\to$16 channel interleaving artifact that
+FreeEEG128's synchronized 16$\times$ADS131M08 architecture eliminates.
+More recent entries --- PiEEG, IronBCI, HackEEG, BIOADC,
 Neurogate~OctaFlow --- cover an expanding range of channel counts, packaging,
 and wireless protocols, but none have delivered 128-channel density with
 full medical-grade isolation, free licensing of both firmware and hardware,

@@ -173,6 +173,7 @@ FreeEEG128 sits in this lineage:
 | **PiEEG / IronBCI** | 2020s | Pi-HAT and STM32F4 + ADS1299; explicit FreeEEG32 successor. Validation preprint vs BioSemi. |
 | **FreeEEG32-beta** (NeuroIDSS / Vivancos) | 2021 | Proved ADS131M08 (vs industry-default ADS1299) hits research-grade noise. |
 | **FreeEEG128-alpha** (NeuroIDSS) | 2023 | 16× ADS131M08 scale-up; STM32H743; ~5 units worldwide. |
+| **Cardona-Álvarez et al. OpenBCI framework** | 2023 | Custom-driver overhaul of OpenBCI Cyton+Daisy; Raspberry Pi as acquisition server; Kafka-distributed compute; LDR-based marker sync. Most detailed published architecture for an open-hardware BCI framework. Sensors **23**, 3763. |
 | **Neurogate OctaFlow** | 2024 | ESP32-C3 + ADS1299, 8-ch, LSL/WebSocket native. Adafruit-ecosystem-compatible teaching board. |
 | **FreeEEG128 beta** (this project) | 2026- | STM32H743 + ESP32-S3 co-processor; cap-mounted brain-box + belt-pack amp; CERN-OHL-S licensing; Open Ephys GUI + BrainFlow + LSL native. |
 

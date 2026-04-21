@@ -123,7 +123,7 @@ BCI hardware landscape.
 
 [3] Szell, A. et al. OPETH: Open Source Solution for Real-Time Peri-Event Time Histogram Based on Open Ephys. *Front. Neuroinform.* **14**, 21 (2020). doi:10.3389/fninf.2020.00021.
 
-[4] Cardona-Alvarez, Y.N. et al. A Novel OpenBCI Framework for EEG-Based Neurophysiological Experiments. *Sensors* **23**, 3763 (2023). doi:10.3390/s23073763.
+[4] Cardona-Alvarez, Y.N., Álvarez-Meza, A.M., Cárdenas-Peña, D.A., Castaño-Duque, G.A. & Castellanos-Domínguez, G. A Novel OpenBCI Framework for EEG-Based Neurophysiological Experiments. *Sensors* **23**(7), 3763 (2023). doi:10.3390/s23073763. **Architecture reference for open-hardware BCI frameworks.** Raspberry Pi as acquisition server (validates our Pi Zero 2W companion choice); three-layer driver design; distributed computing via Apache Kafka; marker sync via Light-Dependent Resistor (analogous to our Labstreamer photodiode); impedance via ADS1299 6 nA @ 31.25 Hz lead-off drive; 56 ms end-to-end latency with 5.7 ms wireless jitter benchmarked against BCI2000+g.USBamp and OpenViBE+TMSi. Only validated motor imagery — P300/SSVEP/N170 gap fillable by FreeEEG128. Documents the OpenBCI Cyton+Daisy 8→16 channel *interleaving* artifact (alternating samples between boards requires interpolation) — **FreeEEG128's TIM1/TIM8-synchronized 16× ADS131M08 cascade eliminates that artifact entirely**. Open source: <https://github.com/UN-GCPDS/openbci-stream>, <https://github.com/UN-GCPDS/BCI-framework>, <https://docs.bciframework.org/>.
 
 [5] Knierim, M.T., Schemmer, M. & Bauer, N. A simplified design of a cEEGrid ear-electrode adapter for the OpenBCI biosensing platform. *HardwareX* **12**, e00357 (2022). doi:10.1016/j.ohx.2022.e00357.
 
